@@ -1379,48 +1379,28 @@ static NSURL *newCoverURL(NSURL *originalURL) {
 //     return %orig(newCoverURL(arg1), arg2, arg3, arg4, arg5);
 // }
 // %end
-%hook YTAppDelegate
-- (void)applicationDidFinishLaunching:(id)application {
-    NSError *error = nil;
-    [[AVAudioSession sharedInstance] setCategory:AVAudioSessionCategoryAmbient
-                                     withOptions:AVAudioSessionCategoryOptionMixWithOthers
-                                           error:&error];
-    if (error) {
-        NSLog(@"YTLite: AVAudioSession 설정 실패: %@", error.localizedDescription);
-    } else {
-        NSLog(@"YTLite: 오디오 세션 설정 성공 - Category: %@, Options: %lu",
-              [AVAudioSession sharedInstance].category,
-              (unsigned long)[AVAudioSession sharedInstance].categoryOptions);
+%hook AVAudioSession
+- (BOOL)setActive:(BOOL)active error:(NSError **)outError {
+    if (active) {
+        NSLog(@"YTLite: 오디오 세션 활성화 차단");
+        return YES; // YouTube가 세션을 활성화하려 해도 성공한 척 반환
     }
-    [[AVAudioSession sharedInstance] setActive:YES error:nil];
-    %orig;
+    return %orig;
 }
 %end
 
-%hook YTPlayerViewController
+%hook AVPlayer
 - (void)play {
-    NSError *error = nil;
-    [[AVAudioSession sharedInstance] setCategory:AVAudioSessionCategoryAmbient
-                                     withOptions:AVAudioSessionCategoryOptionMixWithOthers
-                                           error:&error];
-    if (error) {
-        NSLog(@"YTLite: AVAudioSession 설정 실패 (YTPlayerViewController): %@", error.localizedDescription);
-    }
-    [[AVAudioSession sharedInstance] setActive:YES error:nil];
+    [self setMuted:YES]; // YouTube 동영상 음소거
+    NSLog(@"YTLite: AVPlayer 음소거 적용");
     %orig;
 }
 %end
 
 %hook AVPictureInPictureController
 - (void)startPictureInPicture {
-    NSError *error = nil;
-    [[AVAudioSession sharedInstance] setCategory:AVAudioSessionCategoryAmbient
-                                     withOptions:AVAudioSessionCategoryOptionMixWithOthers
-                                           error:&error];
-    if (error) {
-        NSLog(@"YTLite: AVAudioSession 설정 실패 (PiP): %@", error.localizedDescription);
-    }
-    [[AVAudioSession sharedInstance] setActive:YES error:nil];
+    [AVPlayerLayer playerLayerWithPlayer:nil]; // PiP에서 오디오 재생 차단
+    NSLog(@"YTLite: PiP 오디오 차단");
     %orig;
 }
 %end
