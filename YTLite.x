@@ -1379,7 +1379,51 @@ static NSURL *newCoverURL(NSURL *originalURL) {
 //     return %orig(newCoverURL(arg1), arg2, arg3, arg4, arg5);
 // }
 // %end
+%hook YTAppDelegate
+- (void)applicationDidFinishLaunching:(id)application {
+    NSError *error = nil;
+    [[AVAudioSession sharedInstance] setCategory:AVAudioSessionCategoryAmbient
+                                     withOptions:AVAudioSessionCategoryOptionMixWithOthers
+                                           error:&error];
+    if (error) {
+        NSLog(@"YTLite: AVAudioSession 설정 실패: %@", error.localizedDescription);
+    } else {
+        NSLog(@"YTLite: 오디오 세션 설정 성공 - Category: %@, Options: %lu",
+              [AVAudioSession sharedInstance].category,
+              (unsigned long)[AVAudioSession sharedInstance].categoryOptions);
+    }
+    [[AVAudioSession sharedInstance] setActive:YES error:nil];
+    %orig;
+}
+%end
 
+%hook YTPlayerViewController
+- (void)play {
+    NSError *error = nil;
+    [[AVAudioSession sharedInstance] setCategory:AVAudioSessionCategoryAmbient
+                                     withOptions:AVAudioSessionCategoryOptionMixWithOthers
+                                           error:&error];
+    if (error) {
+        NSLog(@"YTLite: AVAudioSession 설정 실패 (YTPlayerViewController): %@", error.localizedDescription);
+    }
+    [[AVAudioSession sharedInstance] setActive:YES error:nil];
+    %orig;
+}
+%end
+
+%hook AVPictureInPictureController
+- (void)startPictureInPicture {
+    NSError *error = nil;
+    [[AVAudioSession sharedInstance] setCategory:AVAudioSessionCategoryAmbient
+                                     withOptions:AVAudioSessionCategoryOptionMixWithOthers
+                                           error:&error];
+    if (error) {
+        NSLog(@"YTLite: AVAudioSession 설정 실패 (PiP): %@", error.localizedDescription);
+    }
+    [[AVAudioSession sharedInstance] setActive:YES error:nil];
+    %orig;
+}
+%end
 %ctor {
     if (ytlBool(@"shortsOnlyMode") && (ytlBool(@"removeShorts") || ytlBool(@"reExplore"))) {
         ytlSetBool(NO, @"removeShorts");
