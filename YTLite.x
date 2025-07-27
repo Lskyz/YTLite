@@ -1379,29 +1379,115 @@ static NSURL *newCoverURL(NSURL *originalURL) {
 //     return %orig(newCoverURL(arg1), arg2, arg3, arg4, arg5);
 // }
 // %end
+// AVAudioSession 완전 차단
 %hook AVAudioSession
 - (BOOL)setActive:(BOOL)active error:(NSError **)outError {
     if (active) {
-        NSLog(@"YTLite: 오디오 세션 활성화 차단");
-        return YES; // YouTube가 세션을 활성화하려 해도 성공한 척 반환
+        NSLog(@"YTLite: YouTube 오디오 세션 활성화 차단");
+        if (outError) *outError = nil;
+        return YES;
     }
     return %orig;
 }
+- (BOOL)setCategory:(AVAudioSessionCategory)category withOptions:(AVAudioSessionCategoryOptions)options error:(NSError **)outError {
+    NSLog(@"YTLite: YouTube 오디오 세션 카테고리 설정 시도: %@, Options: %lu, 차단됨", category, (unsigned long)options);
+    if (outError) *outError = nil;
+    return YES;
+}
+- (BOOL)setMode:(AVAudioSessionMode)mode error:(NSError **)outError {
+    NSLog(@"YTLite: YouTube 오디오 세션 모드 설정 시도: %@, 차단됨", mode);
+    if (outError) *outError = nil;
+    return YES;
+}
+- (BOOL)configureAudioSessionWithError:(NSError **)outError {
+    NSLog(@"YTLite: YouTube 오디오 세션 구성 시도, 차단됨");
+    if (outError) *outError = nil;
+    return YES;
+}
 %end
 
+// AVPlayer 음소거 및 오디오 차단
 %hook AVPlayer
 - (void)play {
-    [self setMuted:YES]; // YouTube 동영상 음소거
+    [self setMuted:YES];
     NSLog(@"YTLite: AVPlayer 음소거 적용");
+    %orig;
+}
+- (void)setVolume:(float)volume {
+    NSLog(@"YTLite: YouTube 볼륨 설정 시도: %f, 무시됨", volume);
+    [self setMuted:YES];
+}
+- (BOOL)isMuted {
+    return YES; // 항상 음소거 강제
+}
+- (void)replaceCurrentItemWithPlayerItem:(AVPlayerItem *)item {
+    NSLog(@"YTLite: AVPlayer 아이템 교체 시도, 오디오 차단");
+    if (item) [item setAudioMix:nil]; // 오디오 믹스 제거
     %orig;
 }
 %end
 
+// AVPlayerItem 오디오 믹스 차단
+%hook AVPlayerItem
+- (void)setAudioMix:(AVAudioMix *)audioMix {
+    NSLog(@"YTLite: YouTube 오디오 믹스 설정 시도, 차단됨");
+    // 오디오 믹스 무시
+}
+- (NSArray *)audioTracks {
+    NSLog(@"YTLite: YouTube 오디오 트랙 요청, 빈 배열 반환");
+    return @[]; // 오디오 트랙 제거
+}
+%end
+
+// PiP 모드 오디오 차단
 %hook AVPictureInPictureController
 - (void)startPictureInPicture {
-    [AVPlayerLayer playerLayerWithPlayer:nil]; // PiP에서 오디오 재생 차단
-    NSLog(@"YTLite: PiP 오디오 차단");
+    NSLog(@"YTLite: PiP 모드 시작, 오디오 차단");
+    [self setPlayerLayer:nil]; // PiP 오디오 재생 차단
     %orig;
+}
+- (id)initWithPlayerLayer:(AVPlayerLayer *)playerLayer {
+    NSLog(@"YTLite: PiP 초기화, 오디오 차단");
+    return %orig(nil); // 플레이어 레이어 null로 설정
+}
+%end
+
+// YouTube 백그라운드 재생 차단
+%hook YTIPlayerResponse
+- (BOOL)isPlayableInBackground {
+    NSLog(@"YTLite: 백그라운드 재생 차단");
+    return NO;
+}
+%end
+
+// YouTube 비디오 재생 오디오 억제
+%hook YTPlayerView
+- (void)playVideo {
+    NSLog(@"YTLite: YouTube 비디오 재생 시도, 오디오 차단");
+    %orig;
+}
+%end
+
+// YouTube 내부 오디오 관리 차단
+%hook YTSingleVideoController
+- (void)play {
+    NSLog(@"YTLite: YTSingleVideoController 재생 시도, 오디오 차단");
+    %orig;
+}
+- (void)setVolume:(float)volume {
+    NSLog(@"YTLite: YTSingleVideoController 볼륨 설정 시도: %f, 무시됨", volume);
+}
+%end
+
+// YouTube 오디오 세션 매니저 차단
+%hook YTMAudioSessionManager
+- (void)configureAudioSession {
+    NSLog(@"YTLite: YTMAudioSessionManager 구성 시도, 차단됨");
+    // 구성 무시
+}
+- (void)updateAudioSession {
+    NSLog(@"YTLite: YTMAudioSessionManager 업데이트 시도, 차단됨");
+    // 업데이트 무시
 }
 %end
 %ctor {
